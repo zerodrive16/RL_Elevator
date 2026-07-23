@@ -22,7 +22,7 @@ import random
 
 
 class ElevatorEnv:
-    def __init__(self, n_floors=4, p=0.3, capacity=5, seed=None):
+    def __init__(self, n_floors=4, p=0.01, capacity=5, seed=None):
         self.n_floors = n_floors
         self.p = p
         self.capacity = capacity  # bindet in dieser Stufe (max. 1 Pers./Ziel) nie, siehe Bericht
@@ -87,7 +87,7 @@ class ElevatorEnv:
         return sum(self.waiting) + sum(self.targets)
 
 
-def demo(steps=15, p=0.3, seed=42):
+def demo(steps=100, p=0.01, seed=42):
     """Simuliert die Umgebung mit einer zufaelligen (noch nicht gelernten) Aktionswahl,
     um zu zeigen, dass die Umwelt-Dynamik unabhaengig von einer Strategie funktioniert."""
     env = ElevatorEnv(p=p, seed=seed)
