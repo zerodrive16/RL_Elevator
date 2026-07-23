@@ -53,12 +53,16 @@ class ElevatorEnv:
         return self.get_state()
 
     def get_state(self):
+        # oeffentlich sichtbarer Zustand fuer aussen (z.B. value_iteration.raw_state):
+        # waiting_dest nutzt intern schon None/Etage, hier nur zur Anzeige auf 0/Etage gemappt
         w = tuple(0 if d is None else d for d in self.waiting_dest)  # d ist bereits Etage 1..4, kein +1 noetig
         return (self.floor, self.door_open, w, tuple(self.cabin_dest))
 
     def available_actions(self):
+        # bei offener Tuer ist laut Aufgabenstellung ausschliesslich Schliessen (S) erlaubt
         if self.door_open:
             return ["S"]
+        # Tuer ist zu: Oeffnen (O) geht immer, H/R nur wenn nicht am Rand des Gebaeudes
         actions = ["O"]
         if self.floor < self.n_floors:
             actions.append("H")
@@ -67,14 +71,17 @@ class ElevatorEnv:
         return actions
 
     def step(self, action):
+        # 1) Aktion validieren
         if action not in self.available_actions():
             raise ValueError(f"Aktion {action} in Zustand {self.get_state()} nicht verfuegbar")
 
+        # 2) Kosten IM alten Zustand messen (c(s,a) haengt nur von s ab, nicht vom Ergebnis von a)
         cost = self._cost()
         self.t += 1  # Zeit VOR der Verarbeitung erhoehen, damit self.t exakt der
                      # Nummer dieses step()-Aufrufs entspricht (t=1 beim ersten Aufruf,
                      # deckungsgleich mit der Konsolen-Zeile in demo())
 
+        # 3) deterministischer Teil: Aktion ausfuehren und Zustand entsprechend aendern
         if action == "H":
             self.floor += 1
             self.door_open = False
@@ -116,31 +123,40 @@ class ElevatorEnv:
                 self.waiting_dest[idx] = None
                 self.waiting_start[idx] = None
 
-        # stochastischer Ankunftsprozess: pro Etage unabhaengig, Ziel sofort bekannt
+        # 4) stochastischer Teil: NACH der Aktion, pro Etage unabhaengig mit Wahrscheinlichkeit p
+        # eine neue Person, deren Ziel sofort (zufaellig, ungleich der eigenen Etage) feststeht.
+        # Nur Etagen ohne bereits wartende Person koennen neu belegt werden (waiting_dest[idx] is None).
         for idx in range(self.n_floors):
             if self.waiting_dest[idx] is None and self.rng.random() < self.p:
                 etage = idx + 1
                 ziel_kandidaten = [e for e in range(1, self.n_floors + 1) if e != etage]
                 self.waiting_dest[idx] = self.rng.choice(ziel_kandidaten)
-                self.waiting_start[idx] = self.t
+                self.waiting_start[idx] = self.t  # fuer spaetere Fahrtdauer-Berechnung gemerkt
 
         return self.get_state(), cost
 
     def _cost(self):
+        # c(s,a): Anzahl aller offenen Anfragen - wartende Personen + Personen mit Fahrtziel in der Kabine
         wartend = sum(1 for d in self.waiting_dest if d is not None)
         in_kabine = sum(self.cabin_dest)
         return wartend + in_kabine
 
 
 def demo(steps=100, p=0.05, seed=42):
+    """Referenz-/Baseline-Lauf mit rein zufaelliger Aktionswahl (kein Lernen,
+    keine Optimierung) - dient als Vergleichsmassstab (Phase 1) fuer
+    value_iteration.py, das dieselbe ElevatorEnv mit einer gelernten
+    Strategie steuert."""
     env = ElevatorEnv(p=p, seed=seed)
+    # eigener RNG fuer die Aktionswahl, getrennt von env.rng (das nur den
+    # Ankunftsprozess steuert) - sonst wuerden sich beide Zufallsstroeme vermischen
     rng = random.Random(seed)
     state = env.get_state()
     print(f"t=0  Zustand={state}")
 
     total_cost = 0
     for _ in range(steps):
-        action = rng.choice(env.available_actions())
+        action = rng.choice(env.available_actions())  # zufaellige, aber gueltige Aktion
         state, cost = env.step(action)
         total_cost += cost
         print(f"t={env.t:<3} Aktion={action}  Zustand={state}  Kosten={cost}")

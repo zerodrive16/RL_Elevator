@@ -1,0 +1,5 @@
+label,n_floors,p,gamma,steps,n_episodes,avg_total_cost,avg_cost_per_step,avg_discounted_cost,avg_trip_duration,n_completed_trips_total
+phase1_random,4,0.1,0.9,150,20,646.2,4.308,20.2592,27.7245,196
+phase2_vi_full_info,4,0.1,0.9,150,20,391,2.6067,16.1586,10.6623,530
+phase1_random,4,0.1,0.9,150,20,646.2,4.308,20.2592,27.7245,196
+phase2_vi_full_info,4,0.1,0.9,150,20,391,2.6067,16.1586,10.6623,530
