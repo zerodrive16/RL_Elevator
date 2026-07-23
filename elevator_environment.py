@@ -132,7 +132,7 @@ class ElevatorEnv:
         return wartend + in_kabine
 
 
-def demo(steps=30, p=0.3, seed=42):
+def demo(steps=100, p=0.05, seed=42):
     env = ElevatorEnv(p=p, seed=seed)
     rng = random.Random(seed)
     state = env.get_state()
