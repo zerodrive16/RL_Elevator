@@ -102,7 +102,7 @@ class ElevatorEnv:
             # Einsteigen), kann es vorkommen, dass zwei verschiedene wartende
             # Personen (an unterschiedlichen Etagen) zufaellig dasselbe Ziel
             # haben. Steigt in diesem Fall eine zweite Person mit demselben
-            # Ziel ein, waehrend cabin_dest fuer dieses Ziel bereits 1 ist,
+            # Ziel ein, waehrend cabin_dest/ fuer dieses Ziel bereits 1 ist,
             # wird die Startzeit der ERSTEN Person ueberschrieben - die erste
             # Fahrt wird dann nie geloggt (sie "verschwindet" formal aus dem
             # Zustand). Das ist eine bewusste Vereinfachung dieser ersten

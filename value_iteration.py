@@ -25,13 +25,15 @@ from elevator_environment import ElevatorEnv
 
 
 def available_actions(f, door_open, n_floors):
-    """Identisch zu ElevatorEnv.available_actions(), nur zustandslos aufrufbar."""
+    """Identisch zu ElevatorEnv.available_actions(), nur zustandslos aufrufbar.
+    f ist wie ueberall in diesem Modul die ECHTE Etagennummer (1..n_floors),
+    identisch zur Konvention in ElevatorEnv."""
     if door_open:
         return ["S"]
     actions = ["O"]
-    if f < n_floors - 1:
+    if f < n_floors:
         actions.append("H")
-    if f > 0:
+    if f > 1:
         actions.append("R")
     return actions
 
@@ -44,12 +46,15 @@ def cost(w, z):
 
 
 def enumerate_states(n_floors):
-    """Alle syntaktisch moeglichen Zustaende s = (f, door_open, w, z)."""
+    """Alle syntaktisch moeglichen Zustaende s = (f, door_open, w, z).
+    f und die Zielwerte in w sind ECHTE Etagennummern 1..n_floors, identisch
+    zur Konvention in ElevatorEnv (keine Verschiebung noetig)."""
     waiting_options_per_floor = [
-        [None] + [j for j in range(n_floors) if j != i] for i in range(n_floors)
+        [None] + [j for j in range(1, n_floors + 1) if j != i]
+        for i in range(1, n_floors + 1)
     ]
     states = []
-    for f in range(n_floors):
+    for f in range(1, n_floors + 1):
         for door_open in (False, True):
             for w in itertools.product(*waiting_options_per_floor):
                 for z in itertools.product((0, 1), repeat=n_floors):
@@ -59,9 +64,12 @@ def enumerate_states(n_floors):
 
 def apply_action(f, door_open, w, z, action, n_floors):
     """Deterministischer Teil des Uebergangs (vor dem stochastischen Ankunftsprozess),
-    identisch zur Aktionslogik in ElevatorEnv.step()."""
+    identisch zur Aktionslogik in ElevatorEnv.step(). f ist die echte Etagennummer
+    (1..n_floors); w/z sind 0-indizierte Listen (Index i-1 <-> Etage i), genau wie
+    waiting_dest/cabin_dest in ElevatorEnv."""
     w = list(w)
     z = list(z)
+    idx = f - 1
     if action == "H":
         f, door_open = f + 1, False
     elif action == "R":
@@ -70,12 +78,12 @@ def apply_action(f, door_open, w, z, action, n_floors):
         door_open = False
     elif action == "O":
         door_open = True
-        if z[f] == 1:               # Aussteigen
-            z[f] = 0
-        if w[f] is not None:        # Einsteigen (Ziel schon bekannt)
-            ziel = w[f]
-            z[ziel] = 1
-            w[f] = None
+        if z[idx] == 1:               # Aussteigen
+            z[idx] = 0
+        if w[idx] is not None:        # Einsteigen (Ziel schon bekannt)
+            ziel = w[idx]              # echte Zieletage, 1..n_floors
+            z[ziel - 1] = 1
+            w[idx] = None
     return f, door_open, tuple(w), tuple(z)
 
 
@@ -86,10 +94,11 @@ def arrival_distribution(w_mid, p, n_floors):
     Aufzaehlung per itertools.product ueber die Einzelverteilungen je Etage."""
     per_floor = []
     for i in range(n_floors):
+        etage = i + 1                    # echte Etagennummer dieses Listenindex
         if w_mid[i] is not None:
             per_floor.append([(1.0, w_mid[i])])   # schon belegt -> bleibt unveraendert
         else:
-            targets = [j for j in range(n_floors) if j != i]
+            targets = [j for j in range(1, n_floors + 1) if j != etage]
             dist = [(1 - p, None)] + [(p / len(targets), t) for t in targets]
             per_floor.append(dist)
 
@@ -201,7 +210,7 @@ if __name__ == "__main__":
     n_floors = 4   # 4 Etagen -> 4 moegliche Ziele fuer Wartende, 4 moegliche Kabinenziele
     V, policy = value_iteration(n_floors=n_floors, p=0.1, gamma=0.9, theta=1e-4)
 
-    start = (0, False, tuple([None] * n_floors), tuple([0] * n_floors))
+    start = (1, False, tuple([None] * n_floors), tuple([0] * n_floors))
     print(f"\nV*(Startzustand) = {V[start]:.4f}")
     print(f"pi*(Startzustand) = {policy[start]}")
 
