@@ -22,9 +22,14 @@ ACHTUNG Zustandsraumgroesse: |S| = n_floors * 2 * n_floors**n_floors * 2**n_floo
 import csv
 import itertools
 import os
+import sys
 
-from elevator_environment import ElevatorEnv
-from evaluation import append_result, evaluate, make_random_policy, make_table_policy
+# Projekt-Root auf sys.path, damit dieses Skript sowohl per `python -m phase1_2.value_iteration`
+# als auch direkt per `python phase1_2/value_iteration.py` funktioniert (unabhaengig vom CWD).
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from phase1_2.elevator_environment import ElevatorEnv
+from common.evaluation import append_result, evaluate, make_random_policy, make_table_policy
 
 
 def available_actions(f, door_open, n_floors):
@@ -271,17 +276,20 @@ if __name__ == "__main__":
     # (gleiches n_floors/p/gamma/steps/episodes, siehe evaluate() in evaluation.py) ausgewertet
     # und beide an results/runs.csv angehaengt, damit alle Phasen am Ende nebeneinander
     # verglichen werden koennen (nichts wird ueberschrieben, siehe append_result()).
+    env_factory = lambda seed: ElevatorEnv(n_floors=n_floors, p=p, seed=seed)
     random_result = evaluate(
         label="phase1_random",
         policy_fn_factory=make_random_policy,
-        n_floors=n_floors, p=p, gamma=gamma, steps=EVAL_STEPS, n_episodes=EVAL_EPISODES,
+        env_factory=env_factory, gamma=gamma, steps=EVAL_STEPS, n_episodes=EVAL_EPISODES,
+        n_floors=n_floors, p=p,
     )
     vi_result = evaluate(
         label="phase2_vi_full_info",
         # policy ist hier bereits fertig (deterministisch) -> seed wird ignoriert,
         # die Lambda-Signatur muss aber zu policy_fn_factory(seed) passen
         policy_fn_factory=lambda seed: make_table_policy(policy),
-        n_floors=n_floors, p=p, gamma=gamma, steps=EVAL_STEPS, n_episodes=EVAL_EPISODES,
+        env_factory=env_factory, gamma=gamma, steps=EVAL_STEPS, n_episodes=EVAL_EPISODES,
+        n_floors=n_floors, p=p,
     )
     append_result(random_result)
     append_result(vi_result)
