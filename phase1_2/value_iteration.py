@@ -132,7 +132,8 @@ def arrival_distribution(w_mid, p, n_floors):
     return result
 
 
-def value_iteration(n_floors=3, p=0.1, gamma=0.9, theta=1e-4, max_iterations=500, verbose=True):
+def value_iteration(n_floors=3, p=0.1, gamma=0.9, theta=1e-4, max_iterations=500, verbose=True,
+                     return_history=False):
     states = enumerate_states(n_floors)
     V = {s: 0.0 for s in states}   # Start: V_0(s) = 0 fuer alle Zustaende (beliebige Initialisierung reicht)
 
@@ -155,6 +156,12 @@ def value_iteration(n_floors=3, p=0.1, gamma=0.9, theta=1e-4, max_iterations=500
                 for prob, w_next in arrival_distribution(w_mid, p, n_floors)
             ]
 
+    # Startzustand, dessen V-Wert bei return_history=True pro Iteration mitgeloggt
+    # wird (leerer Aufzug, Etage 1) - derselbe, den simulate_policy()/__main__ als
+    # "V*(Startzustand)" ausgeben.
+    start = (1, False, tuple([None] * n_floors), tuple([0] * n_floors))
+    history = []  # [(iteration, delta, V(Startzustand)), ...] - nur befuellt, falls return_history=True
+
     # Hauptschleife: synchrones Bellman-Update ueber ALLE Zustaende, bis sich V kaum
     # noch aendert (delta < theta). Wegen gamma<1 ist das eine Kontraktion -> Konvergenz garantiert.
     policy = {}
@@ -175,12 +182,16 @@ def value_iteration(n_floors=3, p=0.1, gamma=0.9, theta=1e-4, max_iterations=500
             policy[s] = best_action   # gleichzeitig die aktuell beste (greedy) Aktion merken
             delta = max(delta, abs(newV[s] - V[s]))  # groesste Aenderung ueber alle Zustaende hinweg
         V = newV
+        if return_history:
+            history.append((iteration, delta, V[start]))
         if verbose:
             print(f"Iteration {iteration:>3}: max|V_neu - V_alt| = {delta:.6f}")
         if delta < theta:
             if verbose:
                 print(f"Konvergiert nach {iteration} Iterationen.")
             break
+    if return_history:
+        return V, policy, history
     return V, policy
 
 
@@ -190,17 +201,6 @@ def _sort_key(s):
     f, door_open, w, z = s
     w_key = tuple(-1 if x is None else x for x in w)
     return (f, door_open, w_key, z)
-
-
-def print_policy(V, policy):
-    """Gibt V*(s) und die greedy (optimale) Aktion pi*(s) fuer ALLE Zustaende aus."""
-    print(f"\nV* und pi* fuer alle {len(V)} Zustaende:")
-    print(f"{'Zustand (f, Tuer, w, z)':<45} {'V*(s)':>10}   pi*(s)")
-    print("-" * 70)
-    for s in sorted(V.keys(), key=_sort_key):
-        f, door_open, w, z = s
-        zustand_str = f"(f={f}, Tuer={'offen' if door_open else 'zu'}, w={w}, z={z})"
-        print(f"{zustand_str:<45} {V[s]:>10.4f}   {policy[s]}")
 
 
 def export_policy_csv(V, policy, path="policy.csv"):
@@ -294,8 +294,9 @@ if __name__ == "__main__":
     append_result(random_result)
     append_result(vi_result)
 
-    # Schritt 5: Kurzvergleich auf der Konsole, inkl. Gegenprobe avg_discounted_cost
-    # (Monte-Carlo-Schaetzung von V*) gegen den analytisch berechneten Wert V*(Startzustand)
+    # Schritt 5: Kurzvergleich auf der Konsole. avg_discounted_cost ist der Durchschnitt
+    # ueber die simulierten Episoden (Schritt 4, Messen) - dient als Gegenprobe zum
+    # bereits exakt (Schritt 1, Lernen) berechneten V*(Startzustand), nicht dessen Quelle.
     print(f"\nVergleich ueber {EVAL_EPISODES} Episoden x {EVAL_STEPS} Schritte (p={p}, gamma={gamma}):")
     print(f"  {'':<22}{'avg_cost_per_step':>20}{'avg_discounted_cost':>22}{'avg_trip_duration':>20}")
     for r in (random_result, vi_result):

@@ -50,6 +50,8 @@ class ElevatorEnv:
         self.cabin_start = [None] * self.n_floors       # Startzeit der Person mit Ziel i (in Kabine)
         self.t = 0                                       # aktueller Zeitschritt
         self.completed_trips = []                        # Log: Gesamtdauer jeder abgeschlossenen Fahrt
+        self.total_arrivals = 0                           # Log: Anzahl akzeptierter Personen (fuer Erledigungsquote) -
+                                                            # abgeblockte Ankuenfte (Etage schon belegt) zaehlen NICHT mit
         return self.get_state()
 
     def get_state(self):
@@ -132,6 +134,7 @@ class ElevatorEnv:
                 ziel_kandidaten = [e for e in range(1, self.n_floors + 1) if e != etage]
                 self.waiting_dest[idx] = self.rng.choice(ziel_kandidaten)
                 self.waiting_start[idx] = self.t  # fuer spaetere Fahrtdauer-Berechnung gemerkt
+                self.total_arrivals += 1
 
         return self.get_state(), cost
 

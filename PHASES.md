@@ -204,19 +204,61 @@ den Phasenvergleich zaehlen ausschliesslich die *echten*, auf der wahren
 
 ## Ergebnisse im Vergleich (p=0.1, gamma=0.9, siehe `results/runs.csv`)
 
-| | avg_cost_per_step | avg_discounted_cost | avg_trip_duration | `V*(Start)` |
-|---|---|---|---|---|
-| Phase 1 (Random) | 4.31 | 20.26 | 27.72 Schritte | — |
-| Phase 2 (VI, volle Info, Orakel) | 2.61 | 16.16 | 10.66 Schritte | 15.97 |
-| Phase 2b Random (K=3) | 11.63 | 31.83 | 48.32 Schritte | — |
-| Phase 2b VI (K=1, kein Orakel) | 2.84 | 15.74 | 12.89 Schritte | 16.53 |
-| Phase 2b VI (K=2, frueherer Referenzwert) | 4.22 | 20.69 | 12.61 Schritte | 21.23 |
-| **Phase 2b VI (K=3, aktueller Referenzwert)** | **4.67** | **21.94** | **12.53 Schritte** | **22.29** |
-| **Phase 3 (Boolean-Beobachtung, K=3)** | **5.71** | **21.39** | **13.39 Schritte** | *(nicht vergleichbar, siehe oben)* |
+**Methodischer Hinweis vorab:** Phase 1/2 laufen auf `ElevatorEnv` (max. 1
+Person/Etage, Kapazitaet bindet nie), Phase 2b/3 auf `ElevatorEnvV2` (echte
+Kapazitaet/Mehrfachwarten) — **unterschiedliche Umgebungen**, kein 1:1
+vergleichbares Zahlenmaterial. Phase 1/2 dienen als idealisierte Referenz
+(obere Guete-Schranke auf einer einfacheren Aufgabe), nicht als direkter
+Gegner von Phase 2b/3. Die einzige sauber isolierte Cross-Environment-Stelle
+ist **Phase 2b VI (K=1)** — dort ist die Umgebung strukturell auf "max. 1
+Person/Etage" reduziert, wodurch sie mit Phase 2 vergleichbar wird (isoliert
+den reinen Informationseffekt "Ziel bei Ankunft vs. beim Einsteigen bekannt").
 
-Die Monte-Carlo-Schaetzung (`avg_discounted_cost`) liegt bei jeder VI-Zeile
-nah am jeweiligen `V*(Startzustand)` — bestaetigt die Value-Iteration-Rechnung
-unabhaengig, auch fuer das neue Modell.
+*(Werte unten: `EVAL_STEPS=100`, `EVAL_EPISODES=20`, mit `n_total_arrivals`/
+`completion_rate` - siehe naechster Absatz. Fruehere Tabellen in diesem
+Dokument nutzten noch `EVAL_STEPS=150`, daher leicht andere Zahlen.)*
+
+**Tabelle A — Referenz (`ElevatorEnv`, andere/einfachere Umgebung):**
+
+| | avg_cost_per_step | avg_discounted_cost | avg_trip_duration | Erledigungsquote | `V*(Start)` |
+|---|---|---|---|---|---|
+| Phase 1 (Random) | 4.08 | 20.26 | 24.23 Schritte | 36.9 % | — |
+| Phase 2 (VI, volle Info, Orakel) | 2.59 | 16.16 | 10.57 Schritte | 69.5 % | 15.97 |
+
+**Tabelle B — die eigentliche Umgebung (`ElevatorEnvV2`, hier lebt der faire Vergleich):**
+
+| | avg_cost_per_step | avg_discounted_cost | avg_trip_duration | Erledigungsquote | `V*(Start)` |
+|---|---|---|---|---|---|
+| Phase 2b Random (K=3) | 10.67 | 31.83 | 35.71 Schritte | 49.6 % | — |
+| Phase 2b VI (K=1, Bruecke zu Phase 2 s.o.) | 2.76 | 15.73 | 12.17 Schritte | 86.6 % | 16.53 |
+| Phase 2b VI (K=2, frueherer Referenzwert) | 4.16 | 20.69 | 12.56 Schritte | 88.8 % | 21.23 |
+| **Phase 2b VI (K=3, aktueller Referenzwert)** | **4.46** | **21.94** | **12.04 Schritte** | **87.2 %** | **22.29** |
+| **Phase 3 (Boolean-Beobachtung, K=3)** | **4.82** | **21.38** | **12.97 Schritte** | **82.8 %** | *(nicht vergleichbar, siehe oben)* |
+
+**Die Erledigungsquote zeigt den Phase-2b-vs-Phase-3-Unterschied deutlicher
+als die reinen Kosten:** bei `avg_cost_per_step` sehen beide fast gleich aus
+(4.46 vs. 4.82), aber Phase 3 liefert nur 82.8 % der aufgetretenen Personen
+tatsaechlich aus, Phase 2b dagegen 87.2 % — ein Unterschied von ca. 4-5
+Prozentpunkten, der in der reinen Kostenzahl kaum auffaellt.
+
+**Zwei getrennte Schritte, klar zu unterscheiden:** (1) *Lernen* — Value
+Iteration berechnet `V*`/`pi*` exakt fuer JEDEN moeglichen Zustand, bevor
+ueberhaupt simuliert wird (moeglich, weil `P(s'|s,a)` und `c(s,a)`
+vollstaendig bekannt sind - kein Lernen aus Erfahrung noetig). (2) *Messen* —
+die fertige Strategie `pi*` wird auf 20 unabhaengigen simulierten Episoden
+ausgefuehrt (reines Tabellen-Lookup, kein weiteres Lernen), um praktische
+Kennzahlen zu bekommen (Fahrtdauer, Erledigungsquote, ...), die aus `V*`
+allein nicht ablesbar sind. `avg_discounted_cost` (Schritt 2) liegt bei jeder
+VI-Zeile nah am bereits in Schritt 1 exakt berechneten `V*(Startzustand)` —
+das ist eine zusaetzliche Gegenprobe der Rechnung, NICHT deren Quelle.
+
+**Neue Kennzahl `completion_rate` (Erledigungsquote):** zusaetzlich zu
+`avg_trip_duration` jetzt auch `n_total_arrivals`/`completion_rate` verfuegbar
+(Anteil der aufgetretenen Personen, die tatsaechlich abgeliefert wurden) -
+aussagekraeftiger als die reine Fahrtenzahl, v.a. am Kollaps-Punkt (Quote
+faellt sichtbar auf 0%). Instrumentiert in `common/evaluation.py`
+(`n_total_arrivals`, `completion_rate`) + `total_arrivals`-Zaehler in beiden
+Environments; Werte oben in Tabelle A/B bereits eingetragen.
 
 **Wichtige Erkenntnis aus dem Phase-2/2b-Vergleich:** Der Sprung von Phase 2
 (15.97) auf Phase 2b K=1 (16.53) — also NUR das Orakel-Vorwissen ueber das
@@ -514,10 +556,10 @@ kennt und schon bei `p=0.25` kollabiert).
 2. **`gamma` variieren** — z.B. 0.7 vs. 0.9 vs. 0.99, zeigt kurzsichtige vs.
    vorausschauende Strategie (und vermutlich auch Einfluss auf die
    Kollaps-Schwelle: kurzsichtigere Strategien koennten laenger "versuchen").
-3. **Stabilitaet der Monte-Carlo-Schaetzung pruefen** — `EVAL_EPISODES`/
-   `EVAL_STEPS` erhoehen, beobachten wie nah `avg_discounted_cost` an
-   `V*(Startzustand)` heranrueckt (Bezug zur "T-Range"-Herleitung) — im
-   stabilen `p`-Bereich.
+3. **Stabilitaet der Mess-Schaetzung pruefen** — `EVAL_EPISODES`/`EVAL_STEPS`
+   erhoehen, beobachten wie nah `avg_discounted_cost` (Schritt "Messen") an
+   das bereits exakt berechnete `V*(Startzustand)` (Schritt "Lernen")
+   heranrueckt (Bezug zur "T-Range"-Herleitung) — im stabilen `p`-Bereich.
 4. **Visualisierung** (Teil (c)) — Plots aus `results/runs.csv`: Kosten/Schritt
    und Fahrtdauer je Phase ueber `p`, mit expliziter Kennzeichnung der
    Kollaps-Schwellen aus dem Abschnitt oben.

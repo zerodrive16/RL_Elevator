@@ -61,6 +61,8 @@ class ElevatorEnvV2:
         self.cabin_starts = [[] for _ in range(self.n_floors)]     # FIFO-Startzeiten je Kabinenziel (nur Logging)
         self.t = 0
         self.completed_trips = []
+        self.total_arrivals = 0  # Log: Anzahl akzeptierter Personen (fuer Erledigungsquote) - abgeblockte
+                                   # Ankuenfte (Warteschlange schon am Deckel K) zaehlen NICHT mit
         return self.get_state()
 
     def get_state(self):
@@ -130,6 +132,7 @@ class ElevatorEnvV2:
             if self.waiting_count[idx] < self.max_wait_per_floor and self.rng.random() < self.p:
                 self.waiting_count[idx] += 1
                 self.waiting_starts[idx].append(self.t)
+                self.total_arrivals += 1
 
         return self.get_state(), cost
 

@@ -170,12 +170,18 @@ def arrival_distribution(w_mid, p, n_floors, max_wait_per_floor):
 
 
 def value_iteration(n_floors=4, p=0.1, gamma=0.9, capacity=5, max_wait_per_floor=2,
-                     theta=1e-4, max_iterations=500, verbose=True):
+                     theta=1e-4, max_iterations=500, verbose=True, return_history=False):
     states = enumerate_states(n_floors, max_wait_per_floor, capacity)
     V = {s: 0.0 for s in states}
 
     if verbose:
         print(f"Zustandsraumgroesse: {len(states)}")
+
+    # Startzustand, dessen V-Wert bei return_history=True pro Iteration mitgeloggt
+    # wird (leerer Aufzug, Etage 1) - derselbe, den simulate_policy()/__main__ als
+    # "V*(Startzustand)" ausgeben.
+    start = (1, False, tuple([0] * n_floors), tuple([0] * n_floors))
+    history = []  # [(iteration, delta, V(Startzustand)), ...] - nur befuellt, falls return_history=True
 
     # Uebergaenge vorab berechnen (haengen nicht von V ab), wie in value_iteration.py.
     # Gesamtwahrscheinlichkeit = Einsteige-Verteilung (nur bei O) * Ankunfts-Verteilung.
@@ -211,12 +217,16 @@ def value_iteration(n_floors=4, p=0.1, gamma=0.9, capacity=5, max_wait_per_floor
             policy[s] = best_action
             delta = max(delta, abs(newV[s] - V[s]))
         V = newV
+        if return_history:
+            history.append((iteration, delta, V[start]))
         if verbose:
             print(f"Iteration {iteration:>3}: max|V_neu - V_alt| = {delta:.6f}")
         if delta < theta:
             if verbose:
                 print(f"Konvergiert nach {iteration} Iterationen.")
             break
+    if return_history:
+        return V, policy, history
     return V, policy
 
 
