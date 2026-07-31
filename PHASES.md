@@ -147,9 +147,9 @@ bleiben in `results/runs.csv` als dokumentiertes Vergleichsbeispiel erhalten.
   - `z = (z_1,...,z_n)`, `z_i ≥ 0`, mit Nebenbedingung `Σ z_i ≤ capacity` (=5) — ANZAHL Kabinenpassagiere je Zieletage
   - `|S| = n_floors · 2 · (K+1)^{n_floors} · \binom{capacity+n_floors}{n_floors}` = 1008·(K+1)⁴ bei `n_floors=4, capacity=5`
 - **Aktionsraum** `A(s)`: identisch zu Phase 1/2
-- **Uebergangsfunktion** `P(s'|s,a)`: zweistufig —
-  1. Bei `a=O`: Aussteigen (deterministisch, `z_f→0`), danach Einsteigen: `n_board = min(w_f, capacity - Σz)` Personen steigen ein, jede zieht **unabhaengig, gleichverteilt** ihr Ziel unter den `n_floors-1` anderen Etagen ("Variante B") → Multinomialverteilung ueber moegliche `z`-Konfigurationen (`boarding_distribution()`). Bei `a∈{H,R,S}` deterministisch wie in Phase 1/2.
-  2. Danach: Ankunftsprozess wie in Phase 1/2, aber gedeckelt — je Etage `i`: `w_i<K` ⇒ mit Wahrscheinlichkeit `p` auf `w_i+1`, sonst bleibt `w_i` unveraendert (Warteschlange voll)
+- **Uebergangsfunktion** `P(s'|s,a)`: hier stecken (anders als in Phase 1/2) ZWEI Zufallsschritte hintereinander, nicht nur einer —
+  1. Bei `a=O`: erst Aussteigen (deterministisch, `z_f→0`), dann Einsteigen — bis zu `n_board = min(w_f, capacity - Σz)` Personen steigen ein, und **jede zieht sich ihr Ziel einzeln und unabhaengig** (gleichverteilt unter den `n_floors-1` anderen Etagen, "Variante B"). Steigen z.B. 3 Personen gleichzeitig ein, gibt es mehrere moegliche Ergebnisse dafuer (wer von den dreien welches Ziel bekommt), jedes mit seiner eigenen Wahrscheinlichkeit (`boarding_distribution()`). Bei `a∈{H,R,S}` passiert dagegen wie in Phase 1/2 gar nichts Zufaelliges — kein Einsteigen, keine Zielziehung.
+  2. Danach, unabhaengig von `a`: der Ankunftsprozess wie in Phase 1/2, aber gedeckelt — je Etage `i`: `w_i<K` ⇒ mit Wahrscheinlichkeit `p` auf `w_i+1`, sonst bleibt `w_i` unveraendert (Warteschlange schon am Deckel `K`)
 - **Kostenfunktion** `c(s,a) = Σ w_i + Σ z_i` (echte Kopfzahlen)
 - **Diskontierung** `gamma = 0.9`
 
