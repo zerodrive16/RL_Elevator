@@ -6,12 +6,17 @@ Phase 2b, spaeter reduzierte Beobachtung Phase 3).
 Bewusst ENVIRONMENT-AGNOSTISCH gehalten (kein Import von ElevatorEnv/
 ElevatorEnvV2 hier): evaluate() bekommt eine env_factory(seed) uebergeben,
 die eine frische Umgebungsinstanz liefert - egal welchen Typs. So kann
-dieselbe Auswertung fuer Phase 1/2 (elevator_environment.py) UND Phase 2b
-(elevator_environment_2.py) verwendet werden, ohne Code zu duplizieren.
+dieselbe Auswertung fuer Phase 1/2 (Phases/environments/phase1_2.py) UND
+Phase 2b (Phases/environments/phase2b.py) verwendet werden, ohne Code zu
+duplizieren. Tabellen-Lookup-Policies (`make_table_policy()`) liefert nicht
+mehr dieses Modul, sondern direkt die jeweilige Value-Iteration-Instanz
+(`ValueIterationBase.make_table_policy()`, siehe Phases/value_iteration/base.py)
+- die Zustandsdarstellung, mit der eine Tabelle indiziert ist, ist
+phasenspezifisch und gehoert daher zur jeweiligen Value-Iteration-Klasse.
 
 Jede Phase ruft evaluate() mit denselben (gamma, steps, n_episodes) auf und
-haengt das Ergebnis per append_result() an results/runs.csv UND an eine
-phasenspezifische results/{label}.csv an - so bleiben alle bisherigen
+haengt das Ergebnis per append_result() an Results/CSV/runs.csv UND an eine
+phasenspezifische Results/CSV/{label}.csv an - so bleiben alle bisherigen
 Phasen-Ergebnisse erhalten und lassen sich sowohl phasenweise als auch
 gemeinsam vergleichen/plotten (Teil (c) der Aufgabenstellung).
 """
@@ -21,7 +26,7 @@ import os
 import random
 import statistics
 
-RESULTS_DIR = "results"
+RESULTS_DIR = "Results/CSV"
 RUNS_CSV = os.path.join(RESULTS_DIR, "runs.csv")
 
 # Spalten, die NIE Teil des Vergleichs-Schluessels sind (das sind die berechneten
@@ -41,17 +46,6 @@ def make_random_policy(seed):
 
     def policy_fn(env):
         return rng.choice(env.available_actions())
-
-    return policy_fn
-
-
-def make_table_policy(policy):
-    """policy_fn(env) -> Aktion, Tabellen-Lookup einer (z.B. per Value
-    Iteration) vorberechneten Strategie."""
-
-    def policy_fn(env):
-        state = (env.floor, env.door_open, tuple(env.waiting_dest), tuple(env.cabin_dest))
-        return policy[state]
 
     return policy_fn
 

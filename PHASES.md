@@ -14,7 +14,7 @@ weitere offene Experimente (v.a. Teil (c), p-Variation).
 (Quelle: Prof. Dr. Thomas Gabel, Vorlesung "Grundlagen adaptiver
 Wissenssysteme", Folien "Der Zustand der Umgebung" / "Der Zustand eines
 Agenten" / "Voll beobachtbare Umgebungen" — Foliensatz-Screenshots im Repo
-unter `img.png`/`img_1.png`.) Diese Begriffe sind die formale Grundlage
+unter `Scripts/img.png`/`Scripts/img_1.png`.) Diese Begriffe sind die formale Grundlage
 dafuer, warum Phase 1/2/2b MDPs sind und Phase 3 (streng genommen) ein POMDP:
 
 - **Umgebungszustand `s_t^e`**: die (moeglicherweise nicht oeffentlich
@@ -63,30 +63,31 @@ exakt die in "Naechste Schritte"/"Nachtrag" beschriebene, bewusste Naeherung.
 
 ## Phase 1 — Random-Baseline
 
-**Code:** `phase1_2/elevator_environment.py::demo()`, ausgewertet ueber
-`common/evaluation.py::make_random_policy` (Label `phase1_random` in `results/runs.csv`)
+**Code:** `Phases/environments/phase1_2.py::demo()`, ausgewertet ueber
+`Phases/common/evaluation.py::make_random_policy` (Label `phase1_random` in `Results/CSV/runs.csv`)
 
 | Komponente | Beschreibung |
 |---|---|
-| **Umgebung** | `ElevatorEnv`, 4 Etagen, Ankunftswahrscheinlichkeit `p` pro Etage und Zeitschritt, Kapazitaet 5 (bindet in diesem Modell praktisch nie, siehe `phase1_2/elevator_environment.py:40`). |
+| **Umgebung** | `ElevatorEnv`, 4 Etagen, Ankunftswahrscheinlichkeit `p` pro Etage und Zeitschritt, Kapazitaet 5 (bindet in diesem Modell praktisch nie, siehe `Phases/environments/phase1_2.py:40`). |
 | **Was der Agent "weiss"** | Praktisch nichts — der Agent liest nur `available_actions()` (welche Aktionen in diesem Zeitschritt *ueberhaupt gueltig* sind, abhaengig von Etage/Tuerstatus), ignoriert aber vollstaendig, wer wo wartet oder welches Kabinenziel gerade offen ist. Kein Zustand fliesst in die Entscheidung ein. |
 | **Was moeglich ist (Aktionsraum)** | Wie im Aufgabenblatt: `H` (hoch), `R` (runter), `O` (Tuer oeffnen), `S` (Tuer schliessen) — eingeschraenkt auf das, was im aktuellen Zustand zulaessig ist (bei offener Tuer nur `S`, am Rand kein `H`/`R`). |
-| **Strategie** | Gleichverteilt zufaellige Wahl unter den gueltigen Aktionen (`make_random_policy`, `common/evaluation.py:22-30`). Kein Lernen, keine Optimierung. |
+| **Strategie** | Gleichverteilt zufaellige Wahl unter den gueltigen Aktionen (`make_random_policy`, `Phases/common/evaluation.py:42-50`). Kein Lernen, keine Optimierung. |
 | **Zweck** | Referenzpunkt/untere Guete-Schranke: zeigt, wie schlecht es ohne jede Steuerungslogik laeuft — der Massstab, an dem sich jede "intelligente" Strategie messen lassen muss. |
 
 ---
 
 ## Phase 2 — Value Iteration mit voller Information
 
-**Code:** `phase1_2/value_iteration.py` (komplett), ausgewertet ueber
-`common/evaluation.py::make_table_policy` (Label `phase2_vi_full_info`)
+**Code:** `Phases/value_iteration/phase1_2.py` (Phase12ValueIteration) +
+`Phases/value_iteration/base.py` (gemeinsamer Bellman-Loop), ausgewertet ueber
+`ValueIterationBase.make_table_policy()` (Label `phase2_vi_full_info`)
 
 | Komponente | Beschreibung |
 |---|---|
 | **Umgebung** | Dieselbe `ElevatorEnv` wie Phase 1, gleiche Dynamik/Kostenfunktion. Value Iteration baut sich zusaetzlich ein *vollstaendiges* Modell der Uebergangswahrscheinlichkeiten `P(s'|s,a)` nach (`arrival_distribution()`), das `ElevatorEnv` selbst nur stichprobenartig simuliert. |
-| **Was der Agent "weiss"** | **Volle Information.** Sobald eine Person an Etage `i` erscheint, ist ihr echtes Zielstockwerk sofort Teil des beobachtbaren Zustands `w_i` (nicht erst beim Einsteigen) — siehe `phase1_2/elevator_environment.py:98-99`. Der Agent kennt also nicht nur *dass* jemand wartet, sondern *wohin* diese Person will, bevor sie ueberhaupt eingestiegen ist. Das ist mehr Information, als im Aufgabenblatt fuer die reale Steuerung vorgesehen ist (dort: nur Rufknopf gedrueckt ja/nein) — bewusste Vereinfachung fuer diese Phase. |
+| **Was der Agent "weiss"** | **Volle Information.** Sobald eine Person an Etage `i` erscheint, ist ihr echtes Zielstockwerk sofort Teil des beobachtbaren Zustands `w_i` (nicht erst beim Einsteigen) — siehe `Phases/environments/phase1_2.py:131-137`. Der Agent kennt also nicht nur *dass* jemand wartet, sondern *wohin* diese Person will, bevor sie ueberhaupt eingestiegen ist. Das ist mehr Information, als im Aufgabenblatt fuer die reale Steuerung vorgesehen ist (dort: nur Rufknopf gedrueckt ja/nein) — bewusste Vereinfachung fuer diese Phase. |
 | **Was moeglich ist (Aktionsraum)** | Identisch zu Phase 1 (`H`, `R`, `O`, `S`, zustandsabhaengig eingeschraenkt). |
-| **Strategie** | Optimale (kostenminimale) Strategie `pi*`, berechnet per Value Iteration (Bellman-Optimalitaetsgleichung, `phase1_2/value_iteration.py:135-184`). Zur Laufzeit reines Tabellen-Lookup `pi*(s)` — die eigentliche "Intelligenz" steckt vollstaendig in der vorab berechneten Tabelle, nicht in einer Laufzeit-Entscheidung. |
+| **Strategie** | Optimale (kostenminimale) Strategie `pi*`, berechnet per Value Iteration (Bellman-Optimalitaetsgleichung, `Phases/value_iteration/base.py:141-181`, `ValueIterationBase.run()`). Zur Laufzeit reines Tabellen-Lookup `pi*(s)` — die eigentliche "Intelligenz" steckt vollstaendig in der vorab berechneten Tabelle, nicht in einer Laufzeit-Entscheidung. |
 | **Zweck** | Obere Guete-Schranke / Best Case: zeigt, was maximal erreichbar ist, *wenn* der Agent alles ueber die Zukunft wissen duerfte, was in der Welt bereits feststeht. |
 
 ### Formale MDP-Definition (Phase 1 & 2, `ElevatorEnv`)
@@ -98,7 +99,7 @@ exakt die in "Naechste Schritte"/"Nachtrag" beschriebene, bewusste Naeherung.
   - `z = (z_1,...,z_n)`, `z_i ∈ {0,1}` — "mind. eine Person in der Kabine hat Ziel `i`"
   - `|S| = n_floors · 2 · n_floors^{n_floors} · 2^{n_floors}` = 32.768 bei `n_floors=4`
 - **Aktionsraum** `A(s)`: `{H,R,O,S}`, zustandsabhaengig eingeschraenkt — bei `d=offen` nur `{S}`; sonst `{O} ∪ ({H}` falls `f<n_floors) ∪ ({R}` falls `f>1)`
-- **Uebergangsfunktion** `P(s'|s,a)`: deterministischer Teil (Bewegung/Tuer/Ein-Aussteigen, `apply_action()`) gefolgt vom stochastischen Ankunftsprozess — je Etage unabhaengig Bernoulli(`p`), Ziel bei Ankunft sofort gleichverteilt unter den `n_floors-1` anderen Etagen gezogen (`arrival_distribution()`)
+- **Uebergangsfunktion** `P(s'|s,a)`: deterministischer Teil (Bewegung/Tuer, `ValueIterationBase.action_effect_distribution()`; Ein-/Aussteigen, `Phase12ValueIteration._boarding_distribution()`) gefolgt vom stochastischen Ankunftsprozess — je Etage unabhaengig Bernoulli(`p`), Ziel bei Ankunft sofort gleichverteilt unter den `n_floors-1` anderen Etagen gezogen (`arrival_distribution()`)
 - **Kostenfunktion** `c(s,a) = Σ 1[w_i≠0] + Σ z_i` (unabhaengig von `a`)
 - **Diskontierung** `gamma = 0.9`
 
@@ -106,8 +107,8 @@ exakt die in "Naechste Schritte"/"Nachtrag" beschriebene, bewusste Naeherung.
 
 ## Phase 2b — Value Iteration mit realistischer Kapazitaet/Mehrfachwarten
 
-**Code:** `phase2b/elevator_environment_2.py` (Umgebung), `phase2b/value_iteration_2.py`
-(Value Iteration), ausgewertet ueber dieselbe `common/evaluation.py` wie Phase 1/2
+**Code:** `Phases/environments/phase2b.py` (Umgebung), `Phases/value_iteration/phase2b.py`
+(Phase2bValueIteration), ausgewertet ueber dieselbe `Phases/common/evaluation.py` wie Phase 1/2
 (Label `phase2b_random` / `phase2b_vi_realistic`)
 
 | Komponente | Beschreibung |
@@ -115,7 +116,7 @@ exakt die in "Naechste Schritte"/"Nachtrag" beschriebene, bewusste Naeherung.
 | **Umgebung** | Neue Klasse `ElevatorEnvV2`. Zwei Realitaetsluecken aus Phase 1/2 geschlossen: (1) **mehrere Personen** koennen gleichzeitig an derselben Etage warten (gedeckelt durch `max_wait_per_floor`, siehe unten), (2) die **Kabinenkapazitaet (5)** wird jetzt wirklich durchgesetzt — passen nicht alle rein, bleibt der Rest wartend zurueck (in Phase 1/2 konnte das wegen der 1-Person-Vereinfachung nie passieren). |
 | **Was der Agent "weiss"** | Weiterhin **volle Information** — nichts wird versteckt, `w`/`z` sind exakte Zaehler. Aber: das Fahrtziel einer wartenden Person wird jetzt erst **beim Einsteigen** gewuerfelt statt beim Erscheinen ("Variante B" statt "Variante A" aus Phase 2) — passend zur Aufgabenstellung, die Rufknopf (nur Anwesenheit) und Zieltasten "im Inneren der Kabine" (Zielwahl) explizit trennt. Dadurch bleibt `w_i` ein einfacher Zaehler statt eines Vektors pro Zielrichtung — sonst waere der Zustandsraum nicht mehr handhabbar (siehe Diskussion unten). |
 | **Was moeglich ist (Aktionsraum)** | Identisch zu Phase 1/2. |
-| **Strategie** | Value Iteration wie in Phase 2, aber mit neuer Uebergangsfunktion: die Aktion `O` ist jetzt selbst teilweise stochastisch (welches `z_j` beim gleichzeitigen Einsteigen mehrerer Personen erhoeht wird, folgt einer Multinomialverteilung, siehe `phase2b/value_iteration_2.py::boarding_distribution()`), zusaetzlich zum bekannten Ankunftsprozess danach. |
+| **Strategie** | Value Iteration wie in Phase 2, aber mit neuer Uebergangsfunktion: die Aktion `O` ist jetzt selbst teilweise stochastisch (welches `z_j` beim gleichzeitigen Einsteigen mehrerer Personen erhoeht wird, folgt einer Multinomialverteilung, siehe `Phases/value_iteration/phase2b.py::Phase2bValueIteration._boarding_distribution()`), zusaetzlich zum bekannten Ankunftsprozess danach. |
 | **Zweck** | Isoliert die "echte Kapazitaet"-Realitaetsluecke von der "Beobachtungs"-Realitaetsluecke (Phase 3) — zeigt, wie viel allein die Mehrfachwarten-/Kapazitaetsdynamik kostet, bevor zusaetzlich Information reduziert wird. |
 
 **Zustandsraumgroesse & Deckel `max_wait_per_floor` (K):** Die reale Warteschlange
@@ -137,7 +138,7 @@ herausstellte, nicht als Eigenschaft der Aufgabe selbst — siehe Abschnitt
 Verifikation. `K=3` ist der aktuelle Kompromiss aus Robustheit (kollabiert
 bei `p=0.3` nicht mehr) und Rechenzeit; `K=4`/`K=5` sind bewusst noch nicht
 getestet, bis `K=3` durchgehend nachvollzogen ist. Die `K=2`-Ergebnisse
-bleiben in `results/runs.csv` als dokumentiertes Vergleichsbeispiel erhalten.
+bleiben in `Results/CSV/runs.csv` als dokumentiertes Vergleichsbeispiel erhalten.
 
 ### Formale MDP-Definition (Phase 2b, `ElevatorEnvV2`)
 
@@ -161,7 +162,7 @@ zudem das Ueberlastungs-Kollaps-Artefakt bei hoher Last (siehe unten).
 
 ## Phase 3 — Value Iteration mit reduzierter (Boolean-)Beobachtung
 
-**Code:** `phase3/value_iteration_3.py` (Naeherungs-Value-Iteration), ausgefuehrt auf
+**Code:** `Phases/value_iteration/phase3.py` (Phase3ValueIteration, Naeherungs-Value-Iteration), ausgefuehrt auf
 der **echten** `ElevatorEnvV2` aus Phase 2b (Label `phase3_boolean_obs`)
 
 Das ist die im Aufgabenblatt tatsaechlich beschriebene Variante: "nicht
@@ -202,7 +203,7 @@ den Phasenvergleich zaehlen ausschliesslich die *echten*, auf der wahren
 
 ---
 
-## Ergebnisse im Vergleich (p=0.1, gamma=0.9, siehe `results/runs.csv`)
+## Ergebnisse im Vergleich (p=0.1, gamma=0.9, siehe `Results/CSV/runs.csv`)
 
 **Methodischer Hinweis vorab:** Phase 1/2 laufen auf `ElevatorEnv` (max. 1
 Person/Etage, Kapazitaet bindet nie), Phase 2b/3 auf `ElevatorEnvV2` (echte
@@ -256,7 +257,7 @@ das ist eine zusaetzliche Gegenprobe der Rechnung, NICHT deren Quelle.
 `avg_trip_duration` jetzt auch `n_total_arrivals`/`completion_rate` verfuegbar
 (Anteil der aufgetretenen Personen, die tatsaechlich abgeliefert wurden) -
 aussagekraeftiger als die reine Fahrtenzahl, v.a. am Kollaps-Punkt (Quote
-faellt sichtbar auf 0%). Instrumentiert in `common/evaluation.py`
+faellt sichtbar auf 0%). Instrumentiert in `Phases/common/evaluation.py`
 (`n_total_arrivals`, `completion_rate`) + `total_arrivals`-Zaehler in beiden
 Environments; Werte oben in Tabelle A/B bereits eingetragen.
 
@@ -279,8 +280,13 @@ Abschnitt.**
 
 ## Teil (c): p-Variation — Ergebnisse ueber alle Phasen
 
-**Code:** `p_variation.py` — fuehrt Phase 1, 2, 2b und 3 fuer eine Liste von
-`p`-Werten durch und haengt alles an `results/runs.csv` an. Getestet:
+**Code:** `main.py` (frueher `p_variation.py`) — enthaelt `run_phase1()`/
+`run_phase2()`/`run_phase2b()`/`run_phase3()`, die je eine Phase fuer eine
+Liste von `p`-Werten durchfuehren und alles an `Results/CSV/runs.csv`
+anhaengen. Die Tabelle unten wurde mit ALLEN vier Funktionen im `__main__`
+eingebunden erzeugt; aktuell ruft `__main__` (erstmal, kuerzere Laufzeit)
+nur `run_phase2b()` auf - `run_phase1()`/`run_phase2()`/`run_phase3()` bleiben
+unveraendert bestehen und lassen sich jederzeit wieder mit einbinden. Getestet:
 `p ∈ {0.1, 0.15, 0.2, 0.25, 0.3, 0.5}`, Phase 2b/3 bei `K=3`
 (aktueller Referenzwert, siehe oben).
 
@@ -311,7 +317,7 @@ Ab einer bestimmten `p`-Schwelle schliesst die jeweils optimale (VI-)Strategie
 sie es aufgibt, aktiv zu bedienen. Das ist ein eigenstaendiges, ueberprueftes
 Ergebnis (kein Bug), das im Bericht explizit erklaert werden sollte.
 
-### Konkretes Beispiel (p=0.5, K=2, `phase2b/value_iteration_2.py`-Politik)
+### Konkretes Beispiel (p=0.5, K=2, `Phases/value_iteration/phase2b.py`-Politik)
 
 Simulation ab einem gesaettigten Zustand (`w=(2,2,2,2)`, jede Etage am
 Warteschlangen-Deckel, Kabine leer):
@@ -440,9 +446,9 @@ gerechnet (siehe Tabelle "Teil (c)" oben). Ergebnis:
   `p=0.20`, egal ob die reale Umgebung mit `K=2` oder `K=3` simuliert wird.
 
 **Warum das so ist — und warum das die Kernaussage von Phase 3 sogar
-staerkt:** Die Naeherungs-Value-Iteration in `phase3/value_iteration_3.py` rechnet
-auf dem Boolean-Beobachtungsraum, der `K` gar nicht kennt (kein Parameter in
-`value_iteration()` dort) — die berechnete Politik ist also fuer JEDES `K`
+staerkt:** Die Naeherungs-Value-Iteration in `Phases/value_iteration/phase3.py` rechnet
+auf dem Boolean-Beobachtungsraum, der `K` gar nicht kennt (kein Parameter im
+Konstruktor von `Phase3ValueIteration` dort) — die berechnete Politik ist also fuer JEDES `K`
 exakt dieselbe Tabelle, nur die reale Ausfuehrungsumgebung (`ElevatorEnvV2`)
 aendert sich. Phase 2b's Value Iteration dagegen bezieht `K` explizit in ihre
 Uebergangsfunktion ein und kann ihre Bedien-Schwelle daher an einen groesseren
@@ -451,7 +457,7 @@ mehr Kabinen-/Warteschlangenpuffer zu verschieben — nur durch mehr Information
 Das ist ein staerkerer, robusterer Beleg fuer den Wert der Information als der
 urspruengliche p=0.1-Vergleich, der durch das K=2-Artefakt noch verdeckt war.
 
-**Einordnung fuer `K=2` als aelteren Referenzwert:** bleibt in `results/runs.csv`
+**Einordnung fuer `K=2` als aelteren Referenzwert:** bleibt in `Results/CSV/runs.csv`
 und in den Tabellen oben zum Vergleich erhalten, wird aber fuer die
 Interpretation/den Bericht durch `K=3` ersetzt.
 
@@ -507,8 +513,8 @@ Mangel unserer Modellierung, oder genau die im Aufgabenblatt vorgesehene
    gedrueckt, ja/nein). Das ist exakt die Aufgabenstellung, daran gibt es
    nichts zu verbessern.
 2. **Wie das Planungsmodell intern mit dieser Beobachtung umgeht** — die
-   Annahme "besetzt = genau 1 Person" (siehe `action_effect_distribution()`
-   in `phase3/value_iteration_3.py`). Das ist eine zusaetzliche Modellierungsentscheidung
+   Annahme "besetzt = genau 1 Person" (siehe `Phase3ValueIteration._boarding_distribution()`
+   in `Phases/value_iteration/phase3.py:76`). Das ist eine zusaetzliche Modellierungsentscheidung
    *auf* der Beobachtungsbeschraenkung, nicht direkt durch sie vorgegeben.
 
 Punkt 2 so einfach wie moeglich zu halten (keine Wahrscheinlichkeitsschaetzung
@@ -560,6 +566,6 @@ kennt und schon bei `p=0.25` kollabiert).
    erhoehen, beobachten wie nah `avg_discounted_cost` (Schritt "Messen") an
    das bereits exakt berechnete `V*(Startzustand)` (Schritt "Lernen")
    heranrueckt (Bezug zur "T-Range"-Herleitung) — im stabilen `p`-Bereich.
-4. **Visualisierung** (Teil (c)) — Plots aus `results/runs.csv`: Kosten/Schritt
+4. **Visualisierung** (Teil (c)) — Plots aus `Results/CSV/runs.csv`: Kosten/Schritt
    und Fahrtdauer je Phase ueber `p`, mit expliziter Kennzeichnung der
    Kollaps-Schwellen aus dem Abschnitt oben.
