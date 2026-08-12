@@ -12,6 +12,7 @@ ein Upsert - ein erneuter Lauf mit gleichem p/K ersetzt nur die jeweilige
 Zeile, alle anderen p/K-Kombinationen bleiben unberuehrt erhalten).
 """
 
+import csv
 import os
 import random
 
@@ -162,7 +163,7 @@ def plot_phase2b_results(results_by_p, K, path=None):
 
     ax_cost.plot(ps, series("phase2b_random", "avg_cost_per_step"), marker="o", label="Random")
     ax_cost.plot(ps, series("phase2b_vi_realistic", "avg_cost_per_step"), marker="o", label="Value Iteration")
-    ax_cost.set_xlabel("p (Ankunftswahrscheinlichkeit)")
+    ax_cost.set_xlabel("p (Auftrittswahrscheinlichkeit)")
     ax_cost.set_ylabel("avg_cost_per_step")
     ax_cost.set_title(f"Phase 2b: Kosten/Schritt (K={K})")
     ax_cost.legend()
@@ -170,7 +171,7 @@ def plot_phase2b_results(results_by_p, K, path=None):
 
     ax_duration.plot(ps, series("phase2b_random", "avg_trip_duration"), marker="o", label="Random")
     ax_duration.plot(ps, series("phase2b_vi_realistic", "avg_trip_duration"), marker="o", label="Value Iteration")
-    ax_duration.set_xlabel("p (Ankunftswahrscheinlichkeit)")
+    ax_duration.set_xlabel("p (Auftrittswahrscheinlichkeit)")
     ax_duration.set_ylabel("avg_trip_duration (Schritte)")
     ax_duration.set_title(f"Phase 2b: Fahrtdauer (K={K})")
     ax_duration.legend()
@@ -185,7 +186,7 @@ def plot_phase2b_results(results_by_p, K, path=None):
     print(f"Plot gespeichert nach: {path}")
 
 
-def plot_convergence(histories_by_p, results_by_p, K, policy_label, title, y_label="V", path=None):
+def plot_convergence(histories_by_p, K, title, y_label="V", path=None):
     """Konvergenz der Wertfunktion V (Value Iteration) fuer ALLE p in EINEM
     Plot, je p eine eigene Farbe: X-Achse = Iteration der Value Iteration (die
     "Zeitschritte" des Bellman-Updates, NICHT Simulationsschritte), Y-Achse =
@@ -193,25 +194,16 @@ def plot_convergence(histories_by_p, results_by_p, K, policy_label, title, y_lab
     vi.run(return_history=True), siehe
     Phases/value_iteration/base.py::ValueIterationBase.run()).
 
-    Je p zusaetzlich eingezeichnet (gleiche Farbe, andere Linienart): das
-    final konvergierte V* (gestrichelt) und avg_discounted_cost aus der
-    Simulation (gepunktet) - der Unterschied zwischen beiden ist KEINE
-    Ungenauigkeit der Value Iteration (die rechnet exakt), sondern eine
-    Gegenprobe: V* ist exakt berechnet, avg_discounted_cost ist ein
-    simulierter Schaetzwert ueber EVAL_EPISODES endliche Episoden - beide
-    sollten nah beieinander liegen (siehe PHASES.md "Zwei getrennte Schritte:
-    Lernen vs. Messen").
-
-    policy_label: Schluessel in results_by_p[p], um an das evaluate()-Ergebnis
-    heranzukommen (z.B. "phase2b_vi_realistic", das run_phase2b() als eines
-    von mehreren Ergebnissen liefert). None, falls results_by_p[p] bereits
-    direkt das evaluate()-Ergebnis ist (Phase 3, siehe run_phase3() - dort
-    gibt es nur EINE Politik statt Random+VI)."""
+    Das ist "Lernfortschritt" im Sinne von Teil (c) der Aufgabenstellung: wie
+    verbessert sich V ueber die Iterationen bis zur Konvergenz - eine rein
+    algorithmusinterne Groesse, ohne Simulation. Je p zusaetzlich das final
+    konvergierte V* (gestrichelt) sowie die Anzahl der bis dahin benoetigten
+    Iterationen (Textbox)."""
     ps = sorted(histories_by_p.keys())
     colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
 
     fig, ax = plt.subplots(figsize=(9, 6))
-    diffs = []
+    info_lines = []
 
     for i, p in enumerate(ps):
         color = colors[i % len(colors)]
@@ -219,16 +211,11 @@ def plot_convergence(histories_by_p, results_by_p, K, policy_label, title, y_lab
         iterations = [h[0] for h in history]
         v_values = [h[2] for h in history]
         v_star = v_values[-1]
-        result = results_by_p[p][policy_label] if policy_label is not None else results_by_p[p]
-        measured = result["avg_discounted_cost"]
+        n_iterations = iterations[-1]
 
         ax.plot(iterations, v_values, color=color, label=f"p={p}")
         ax.axhline(v_star, color=color, linestyle="--", alpha=0.6)
-        if measured is not None:
-            ax.axhline(measured, color=color, linestyle=":", alpha=0.6)
-            diffs.append(f"p={p}: V*={v_star:.2f}, gemessen={measured:.2f} (Diff={measured - v_star:+.2f})")
-        else:
-            diffs.append(f"p={p}: V*={v_star:.2f}, gemessen=n/a")
+        info_lines.append(f"p={p}: V*={v_star:.2f}, {n_iterations} Iterationen")
 
     ax.set_xlabel("Iteration (Bellman-Update)")
     ax.set_ylabel(y_label)
@@ -236,22 +223,20 @@ def plot_convergence(histories_by_p, results_by_p, K, policy_label, title, y_lab
     ax.grid(True, alpha=0.3)
 
     # zwei getrennte Legenden: Farbe = p (welche Kurve), Linienart = Bedeutung
-    # (Konvergenzkurve/V*/gemessen) - sonst waeren es bei 4 p-Werten x 3
-    # Linien pro p zu viele Eintraege fuer eine einzelne Legende
+    # (Konvergenzkurve/V*) - sonst waeren es bei 4 p-Werten x 2 Linien pro p
+    # zu viele Eintraege fuer eine einzelne Legende
     color_handles = [Line2D([0], [0], color=colors[i % len(colors)], label=f"p={p}") for i, p in enumerate(ps)]
     style_handles = [
         Line2D([0], [0], color="black", linestyle="-", label=f"{y_label}(Startzustand) je Iteration"),
         Line2D([0], [0], color="black", linestyle="--", label=f"{y_label}* (konvergiert)"),
-        Line2D([0], [0], color="black", linestyle=":", label="gemessen (avg_discounted_cost)"),
     ]
     legend_p = ax.legend(handles=color_handles, loc="lower right", title="p", fontsize=9)
     ax.add_artist(legend_p)
     ax.legend(handles=style_handles, loc="center right", fontsize=9)
 
-    # Differenz V* vs. gemessen zusaetzlich als Text ablesbar (nicht nur visuell
-    # als Luecke zwischen gestrichelter/gepunkteter Linie)
+    # Anzahl Iterationen bis Konvergenz zusaetzlich als Text ablesbar
     ax.text(
-        0.02, 0.98, "\n".join(diffs), transform=ax.transAxes, fontsize=8.5,
+        0.02, 0.98, "\n".join(info_lines), transform=ax.transAxes, fontsize=9,
         verticalalignment="top", family="monospace",
         bbox=dict(boxstyle="round", facecolor="white", alpha=0.8, edgecolor="gray"),
     )
@@ -296,7 +281,7 @@ def plot_trip_completion(results_by_p, K, series, title_prefix, path=None):
 
     for label, policy_key in series:
         ax_duration.plot(ps, series_values(policy_key, "avg_trip_duration"), marker="o", label=label)
-    ax_duration.set_xlabel("p (Ankunftswahrscheinlichkeit)")
+    ax_duration.set_xlabel("p (Auftrittswahrscheinlichkeit)")
     ax_duration.set_ylabel("avg_trip_duration (Schritte)")
     ax_duration.set_title(f"{title_prefix}: Fahrtdauer angekommener Fahrten (K={K})")
     ax_duration.legend()
@@ -304,7 +289,7 @@ def plot_trip_completion(results_by_p, K, series, title_prefix, path=None):
 
     for label, policy_key in series:
         ax_ratio.plot(ps, series_values(policy_key, "completion_rate"), marker="o", label=label)
-    ax_ratio.set_xlabel("p (Ankunftswahrscheinlichkeit)")
+    ax_ratio.set_xlabel("p (Auftrittswahrscheinlichkeit)")
     ax_ratio.set_ylabel("completion_rate (angekommen / gesamt gefahren)")
     ax_ratio.set_ylim(0, 1.05)
     ax_ratio.set_title(f"{title_prefix}: Erledigungsquote: angekommen im Verhaeltnis zu allen (K={K})")
@@ -314,6 +299,76 @@ def plot_trip_completion(results_by_p, K, series, title_prefix, path=None):
     fig.tight_layout()
     if path is None:
         path = f"Results/Images/trip_completion_K{K}.png"
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+    print(f"Plot gespeichert nach: {path}")
+
+
+def plot_phase2b_vs_phase3(K, p_values, steps=EVAL_STEPS, n_episodes=EVAL_EPISODES, path=None):
+    """Direkter Vergleich Phase 2b VI vs. Phase 3 ueber p, bei festem K, in
+    EINEM gemeinsamen Chart (zwei Linien je Panel) - anders als
+    plot_trip_completion(), das jede Phase in ein eigenes Bild schreibt.
+    Liest die schon vorhandenen Ergebnisse direkt aus Results/CSV/runs.csv
+    (kein erneuter Value-Iteration-Lauf noetig, falls p/K schon gerechnet
+    wurden - siehe run_phase2b()/run_phase3()).
+
+    Phase 2b und Phase 3 sind bei gleichem p/K direkt vergleichbar (beide
+    werden auf derselben echten ElevatorEnvV2 mit echten Kosten ausgewertet,
+    siehe PHASES.md) - im Gegensatz zu Phase 1/2 (andere Umgebung), die
+    deshalb bewusst NICHT hier mit reingenommen wird.
+
+    WICHTIG: _upsert_row() behandelt steps/n_episodes als Teil des
+    Vergleichsschluessels (nicht als Metrik) - ein Lauf mit anderer
+    Schrittzahl UEBERSCHREIBT eine bestehende Zeile also NICHT, sondern haengt
+    sich als zusaetzliche Zeile an. Es koennen also mehrere Zeilen fuer
+    dieselbe (label, p, K)-Kombination mit unterschiedlichem steps/n_episodes
+    in runs.csv stehen (z.B. ein aelterer 150-Schritte- und ein neuerer
+    100-Schritte-Lauf) - ohne expliziten Filter darauf haengt das Ergebnis
+    von der (nicht garantierten) Zeilenreihenfolge in der Datei ab. Deshalb
+    hier explizit auf steps/n_episodes filtern, statt nur auf (label, p)."""
+    rows = {}
+    with open("Results/CSV/runs.csv", newline="", encoding="utf-8") as f_in:
+        for row in csv.DictReader(f_in):
+            if row["label"] not in ("phase2b_vi_realistic", "phase3_boolean_obs"):
+                continue
+            if row.get("max_wait_per_floor") != str(K):
+                continue
+            if row.get("steps") != str(steps) or row.get("n_episodes") != str(n_episodes):
+                continue
+            rows[(row["label"], float(row["p"]))] = row
+
+    def series(label, field):
+        vals = []
+        for p in p_values:
+            row = rows.get((label, p))
+            v = None if row is None or row[field] in ("", "None") else float(row[field])
+            vals.append(v if v is not None else float("nan"))
+        return vals
+
+    fig, (ax_cost, ax_ratio) = plt.subplots(1, 2, figsize=(11, 4.5))
+
+    ax_cost.plot(p_values, series("phase2b_vi_realistic", "avg_cost_per_step"), marker="o", label="Phase 2")
+    ax_cost.plot(p_values, series("phase3_boolean_obs", "avg_cost_per_step"), marker="o", label="Phase 3")
+    ax_cost.set_xlabel("p (Auftrittswahrscheinlichkeit)")
+    ax_cost.set_ylabel("avg_cost_per_step")
+    ax_cost.set_title(f"Kosten/Schritt (K={K})")
+    ax_cost.legend()
+    ax_cost.grid(True, alpha=0.3)
+
+    ax_ratio.plot(p_values, series("phase2b_vi_realistic", "completion_rate"), marker="o", label="Phase 2")
+    ax_ratio.plot(p_values, series("phase3_boolean_obs", "completion_rate"), marker="o", label="Phase 3")
+    ax_ratio.set_xlabel("p (Auftrittswahrscheinlichkeit)")
+    ax_ratio.set_ylabel("completion_rate")
+    ax_ratio.set_ylim(0, 1.05)
+    ax_ratio.set_title(f"Erledigungsquote (K={K})")
+    ax_ratio.legend()
+    ax_ratio.grid(True, alpha=0.3)
+
+    fig.suptitle("Phase 2 vs. Phase 3 (gleiche echte Umgebung)")
+    fig.tight_layout()
+    if path is None:
+        path = f"Results/Images/phase2b_vs_phase3_K{K}.png"
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     fig.savefig(path, dpi=150)
     plt.close(fig)
@@ -346,8 +401,8 @@ if __name__ == "__main__":
     #     # nichts wird zwischen K=2 und K=3 ueberschrieben.
     #     plot_phase2b_results(all_results, K)
     #     plot_convergence(
-    #         all_histories, all_results, K, "phase2b_vi_realistic",
-    #         title=f"Phase 2b: Konvergenz der Wertfunktion V (K={K})",
+    #         all_histories, K,
+    #         title=f"Phase 2: Konvergenz der Wertfunktion V (K={K})",
     #         path=f"Results/Images/phase2b_convergence_K{K}.png",
     #     )
     #     plot_trip_completion(
@@ -371,8 +426,8 @@ if __name__ == "__main__":
             all_results_p3[p], all_histories_p3[p] = run_phase3(p, K3)
 
         plot_convergence(
-            all_histories_p3, all_results_p3, K3, None,
-            title=f"Phase 3: Konvergenz der Naeherungs-Wertfunktion V_approx (gemessen auf K={K3})",
+            all_histories_p3, K3,
+            title="Phase 3: Konvergenz der Naeherungs-Wertfunktion V_approx",
             y_label="V_approx",
             path=f"Results/Images/phase3_convergence_K{K3}.png",
         )
@@ -382,3 +437,8 @@ if __name__ == "__main__":
             title_prefix="Phase 3",
             path=f"Results/Images/phase3_trip_completion_K{K3}.png",
         )
+
+    # Direkter Vergleich Phase 2b vs. Phase 3 in einem gemeinsamen Chart (fuer
+    # die Ergebnis-Folie) - liest die oben bereits berechneten/aktualisierten
+    # Ergebnisse direkt aus Results/CSV/runs.csv, kein erneuter VI-Lauf noetig.
+    plot_phase2b_vs_phase3(K=3, p_values=P_VALUES)
